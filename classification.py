@@ -3,59 +3,37 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-import faiss  # For efficient nearest neighbor search
 
-def load_data(file_path):
-    try:
-        data = pd.read_csv(file_path)
-        return data
-    except FileNotFoundError:
-        st.error("Dataset file not found.")
-        st.stop()
-    except pd.errors.EmptyDataError:
-        st.error("Dataset is empty.")
-        st.stop()
-    except Exception as e:
-        st.error(f"Error loading dataset: {e}")
-        st.stop()
+# Load the dataset
+def load_data():
+    data = pd.read_csv('qa_dataset_with_embeddings.csv')
+    return data
 
+# Load the pre-calculated embeddings
 def load_embeddings(data):
+    # Convert embeddings from string format to numpy array
     embeddings = np.array(data['Question_Embedding'].apply(lambda x: np.fromstring(x[1:-1], sep=' ')).tolist())
     return embeddings
 
+# Initialize the embedding model
 def initialize_model():
-    model = SentenceTransformer('all-MiniLM-L6-v2')  # Consider other models
+    model = SentenceTransformer('all-MiniLM-L6-v2')
     return model
 
-def build_faiss_index(embeddings):
-    dimension = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(embeddings)
-    return index
-
-def find_similar_questions(user_embedding, index, embeddings, data, threshold=0.7):
-    distances, indices = index.search(user_embedding, k=1)
-    most_similar_idx = indices[0][0]
-    most_similar_score = 1 - distances[0][0]  # Convert distance to similarity
-
-    if most_similar_score > threshold:
-        answer = data.iloc[most_similar_idx]['Answer']
-        return answer, most_similar_score
-    else:
-        return None, None
-
+# Streamlit app
 def main():
     st.title("Health Q&A System")
 
     # Load data and embeddings
-    data = load_data('qa_dataset_with_embeddings.csv')
+    data = load_data()
     embeddings = load_embeddings(data)
+    
+    # Ensure embeddings have the correct shape
+    if embeddings.ndim == 1:
+        embeddings = embeddings.reshape(1, -1)
 
-    # Initialize embedding model
+    # Initialize the embedding model
     model = initialize_model()
-
-    # Create Faiss index
-    faiss_index = build_faiss_index(embeddings)
 
     # User input for question
     user_question = st.text_input("Ask a question about heart, lung, or blood-related health:")
@@ -63,15 +41,37 @@ def main():
     # Button to search for answers
     if st.button("Get Answer"):
         if user_question:
+            # Generate embedding for user question
             user_embedding = model.encode([user_question])
+            
+            # Ensure user_embedding has the correct shape
             user_embedding = np.array(user_embedding)
+            if user_embedding.ndim == 1:
+                user_embedding = user_embedding.reshape(1, -1)
 
-            answer, similarity_score = find_similar_questions(user_embedding, faiss_index, embeddings, data)
+            # Verify dimensions
+            st.write(f"User embedding shape: {user_embedding.shape}")
+            st.write(f"Dataset embeddings shape: {embeddings.shape}")
 
-            if answer:
+            # Calculate cosine similarity
+            try:
+                similarities = cosine_similarity(user_embedding, embeddings)
+            except ValueError as e:
+                st.error(f"Error in similarity calculation: {e}")
+                st.stop()
+
+            # Find the most similar question
+            most_similar_idx = np.argmax(similarities)
+            most_similar_score = similarities[0][most_similar_idx]
+
+            # Define a threshold for similarity score
+            threshold = 0.7
+
+            if most_similar_score > threshold:
+                answer = data.iloc[most_similar_idx]['Answer']
                 st.subheader("Answer:")
                 st.write(answer)
-                st.write(f"Similarity Score: {similarity_score:.2f}")
+                st.write(f"Similarity Score: {most_similar_score:.2f}")
             else:
                 st.write("I apologize, but I don't have information on that topic yet. Could you please ask other questions?")
         else:

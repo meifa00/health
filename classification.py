@@ -27,6 +27,10 @@ def main():
     # Load data and embeddings
     data = load_data()
     embeddings = load_embeddings(data)
+    
+    # Ensure embeddings have the correct shape
+    if embeddings.ndim == 1:
+        embeddings = embeddings.reshape(1, -1)
 
     # Initialize the embedding model
     model = initialize_model()
@@ -44,6 +48,10 @@ def main():
             user_embedding = np.array(user_embedding)
             if user_embedding.ndim == 1:
                 user_embedding = user_embedding.reshape(1, -1)
+
+            # Verify dimensions
+            st.write(f"User embedding shape: {user_embedding.shape}")
+            st.write(f"Dataset embeddings shape: {embeddings.shape}")
 
             # Calculate cosine similarity
             try:

@@ -2,8 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer   
-
+from sentence_transformers import SentenceTransformer  
 
 # Load the dataset
 def load_data():

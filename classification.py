@@ -39,7 +39,7 @@ def main():
         if user_question:
             # Generate embedding for user question
             user_embedding = model.encode([user_question])
-
+            
             # Ensure user_embedding has the correct shape
             user_embedding = np.array(user_embedding)
             if user_embedding.ndim == 1:
@@ -68,6 +68,10 @@ def main():
                 st.write("I apologize, but I don't have information on that topic yet. Could you please ask other questions?")
         else:
             st.write("Please enter a question.")
+
+    # Clear input field button
+    if st.button("Clear"):
+        st.text_input("Ask a question about heart, lung, or blood-related health:", value="", key="clear")
 
 if __name__ == "__main__":
     main()

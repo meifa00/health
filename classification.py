@@ -1,43 +1,85 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import openai
 from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
+import faiss  # For efficient nearest neighbor search
 
-# Replace with your OpenAI API key
-openai.api_key = st.secrets["mykey"]
+def load_data(file_path):
+    try:
+        data = pd.read_csv(file_path)
+        return data
+    except FileNotFoundError:
+        st.error("Dataset file not found.")
+        st.stop()
+    except pd.errors.EmptyDataError:
+        st.error("Dataset is empty.")
+        st.stop()
+    except Exception as e:
+        st.error(f"Error loading dataset: {e}")
+        st.stop()
 
-def load_data():
-    df = pd.read_csv("qa_dataset_with_embeddings.csv")
-    questions = df['Question'].tolist()
-    embeddings = np.array(df['Question_Embedding'].tolist())
-    return df, questions, embeddings
+def load_embeddings(data):
+    embeddings = np.array(data['Question_Embedding'].apply(lambda x: np.fromstring(x[1:-1], sep=' ')).tolist())
+    return embeddings
 
-df, questions, embeddings = load_data()
+def initialize_model():
+    model = SentenceTransformer('all-MiniLM-L6-v2')  # Consider other models
+    return model
 
-def get_embedding(text, model="text-embedding-ada-002"):
-    return openai.Embedding.create(input=[text], model=model)['data'][0]['embedding']
+def build_faiss_index(embeddings):
+    dimension = embeddings.shape[1]
+    index = faiss.IndexFlatL2(dimension)
+    index.add(embeddings)
+    return index
 
-def find_best_match(user_question, questions, embeddings, threshold=0.7):
-    query_embedding = get_embedding(user_question)
-    similarities = cosine_similarity([query_embedding], embeddings)[0]
-    best_match_index = np.argmax(similarities)
-    best_match_similarity = similarities[best_match_index]
+def find_similar_questions(user_embedding, index, embeddings, data, threshold=0.7):
+    distances, indices = index.search(user_embedding, k=1)
+    most_similar_idx = indices[0][0]
+    most_similar_score = 1 - distances[0][0]  # Convert distance to similarity
 
-    if best_match_similarity >= threshold:
-        return df.iloc[best_match_index]['Answer'], best_match_similarity
+    if most_similar_score > threshold:
+        answer = data.iloc[most_similar_idx]['Answer']
+        return answer, most_similar_score
     else:
-        return "I apologize, but I don't have information on that topic yet. Could you please ask other questions?", None
-        
-def main():
-    st.title("Heart, Lung, and Blood Health Assistant")
+        return None, None
 
-    user_question = st.text_input("Ask your question here:")
-    if st.button("Submit"):
-        answer, similarity = find_best_match(user_question, questions, embeddings)
-        st.success(answer)
-        if similarity:
-            st.write(f"Similarity Score: {similarity:.2f}")
+def main():
+    st.title("Health Q&A System")
+
+    # Load data and embeddings
+    data = load_data('qa_dataset_with_embeddings.csv')
+    embeddings = load_embeddings(data)
+
+    # Initialize embedding model
+    model = initialize_model()
+
+    # Create Faiss index
+    faiss_index = build_faiss_index(embeddings)
+
+    # User input for question
+    user_question = st.text_input("Ask a question about heart, lung, or blood-related health:")
+
+    # Button to search for answers
+    if st.button("Get Answer"):
+        if user_question:
+            user_embedding = model.encode([user_question])
+            user_embedding = np.array(user_embedding)
+
+            answer, similarity_score = find_similar_questions(user_embedding, faiss_index, embeddings, data)
+
+            if answer:
+                st.subheader("Answer:")
+                st.write(answer)
+                st.write(f"Similarity Score: {similarity_score:.2f}")
+            else:
+                st.write("I apologize, but I don't have information on that topic yet. Could you please ask other questions?")
+        else:
+            st.write("Please enter a question.")
+
+    # Clear input field button
+    if st.button("Clear"):
+        st.text_input("Ask a question about heart, lung, or blood-related health:", value="", key="clear")
 
 if __name__ == "__main__":
     main()

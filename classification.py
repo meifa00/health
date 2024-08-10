@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
+openai.api_key = st.secrets["mykey"]
+
 # Load the dataset
 def load_data():
     data = pd.read_csv('qa_dataset_with_embeddings.csv')

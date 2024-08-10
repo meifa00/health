@@ -3,9 +3,6 @@ import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-import openai
-
-openai.api_key = st.secrets["mykey"]
 
 # Load the dataset
 def load_data():
@@ -14,6 +11,7 @@ def load_data():
 
 # Load the pre-calculated embeddings
 def load_embeddings(data):
+    # Convert embeddings from string format to numpy array
     embeddings = np.array(data['Question_Embedding'].apply(lambda x: np.fromstring(x[1:-1], sep=' ')).tolist())
     return embeddings
 
@@ -42,8 +40,17 @@ def main():
             # Generate embedding for user question
             user_embedding = model.encode([user_question])
 
+            # Ensure user_embedding has the correct shape
+            user_embedding = np.array(user_embedding)
+            if user_embedding.ndim == 1:
+                user_embedding = user_embedding.reshape(1, -1)
+
             # Calculate cosine similarity
-            similarities = cosine_similarity(user_embedding, embeddings)
+            try:
+                similarities = cosine_similarity(user_embedding, embeddings)
+            except ValueError as e:
+                st.error(f"Error in similarity calculation: {e}")
+                st.stop()
 
             # Find the most similar question
             most_similar_idx = np.argmax(similarities)

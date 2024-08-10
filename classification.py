@@ -2,7 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from sentence_transformers import SentenceTransformer
+from sentence_transformers import SentenceTransformer   
+
 
 # Load the dataset
 def load_data():
@@ -27,10 +28,9 @@ def main():
     # Load data and embeddings
     data = load_data()
     embeddings = load_embeddings(data)
-    
+
     # Ensure embeddings have the correct shape
-    if embeddings.ndim == 1:
-        embeddings = embeddings.reshape(1, -1)
+    embeddings = embeddings.reshape(-1, embeddings.shape[1])  # Reshape embeddings
 
     # Initialize the embedding model
     model = initialize_model()
@@ -43,7 +43,7 @@ def main():
         if user_question:
             # Generate embedding for user question
             user_embedding = model.encode([user_question])
-            
+
             # Ensure user_embedding has the correct shape
             user_embedding = np.array(user_embedding)
             if user_embedding.ndim == 1:
@@ -56,6 +56,7 @@ def main():
             # Calculate cosine similarity
             try:
                 similarities = cosine_similarity(user_embedding, embeddings)
+                # ... rest of your code
             except ValueError as e:
                 st.error(f"Error in similarity calculation: {e}")
                 st.stop()
